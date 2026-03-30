@@ -1,128 +1,114 @@
-<p align="center">
-  <img alt="PowerShell" src="https://img.shields.io/badge/PowerShell-5.0+-blue?logo=powershell&logoColor=white" />
-  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows&logoColor=blue" />
-  <img alt="License: Unlicense" src="https://img.shields.io/badge/license-Unlicense-lightgrey.svg?logo=openaccess&logoColor=blue" />
-  <img alt="Version" src="https://img.shields.io/badge/version-1.2.0-blueviolet?logo=semantic-release" />
-  <img alt="Status" src="https://img.shields.io/badge/status-Stable-brightgreen?logo=checkmarx" />
-</p>
+# PowerShell Script Bootstrap
 
-## Bootstrap Variants
-This repository includes two PowerShell script templates:
+A minimal, grab-and-go starting point for PowerShell scripts. Clone it, copy the template, and start writing logic — structured logging, log rotation, and startup diagnostics are already wired up.
 
-| Variant	| Description |
-|---------|-------------|
-| Full	  | Complete template for production-quality scripts with log rotation, module management, and structured sections. Ideal for scheduled tasks or reusable automation. |
-| Lite | Minimal version focused on ad-hoc use. Same logging format, no rotation or module handling. Great for short scripts or quick admin tasks. |
+---
 
-Both use the same `Write-Log` function, so transitioning between them is seamless.
+## What's Included
+
+| File | Purpose |
+|------|---------|
+| `template.ps1` | Starting point for any new script |
+| `logger.ps1` | Logging module — dot-sourced by the template |
+
+---
 
 ## Quick Start
-### Manual Setup
-You can just copy and paste the code from the templates into your IDE.
-
-#### OR
-Run the following commands to enable auto template population in VS Code
-1. Install the VS Code Snippet
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
-irm https://raw.githubusercontent.com/kdscheuer/PowerShellScriptBootStrap/main/setup/setup.ps1 | iex
-```
-2. In VS Code open a new .ps1 file, and enter
-``` powershell
-!bs # Then Tab or Enter for full template
-OR
-!bsl # Then Tab or Enter for the Lite template
-``` 
-
-# PowerShell Script Template
-- [Overview](#overview)
-- [Logging](#logging)
-  - [Examples](#examples)
-  - [Log File](#log-file)
-  - [Log Rotation](#log-rotation)
-  - [Log Levels](#log-levels)
-- [Error Handling](#error-handling)
-- [Scheduled Task Considerations](#scheduled-task-considerations)
-- [Extending the Script](#extending-the-script)
-- [License](#license)
-
-## Overview
-This template provides a solid starting point for custom PowerShell scripts, allowing you to focus immediately on your core logic. It handles logging, log file rotation, error handling, and environment setup, whether the script runs manually or via Scheduled Task.
-
-Features include:
-- Automatic log file creation with timestamped filenames
-- Log rotation for files older than a configurable number of days (default: 7)
-- Multi-level logging with color-coded console output
-- Execution time tracking and clean exit codes
-- Module import with error detection and install hints
-
-
-## Logging
-### Examples
-Use the `Write-Log` function like this:
 
 ```powershell
-Write-Log "Removed $user from $group"
-Write-Log "Removed $user from $group" -Level "INFO"
-Write-Log -Message "$user was not in $group" -Level "WARN"
-Write-Log "Failed to remove $user: $_" -Level "ERROR"
-Write-Log "This is a debug message" -Level "DEBUG"
-Write-Log "Notice: special event happened" -Level "NOTICE"
+git clone https://github.com/KDScheuer/PowerShellScriptBootStrap.git
 ```
 
-### Log File
-Logs are saved to a `logs` subdirectory within the script's root path. The log file is timestamped to avoid overwriting previous runs.
+1. Copy `template.ps1` and rename it for your script
+2. Update the comment-based help block at the top (`.SYNOPSIS`, `.DESCRIPTION`, etc.)
+3. Set your log prefix, retention period, and minimum log level in `Initialize-Logging`
+4. Write your logic inside the `try` block
 
-The suffix `-YYYYMMDD-T-HHMMSS.log` is appended automatically to the value of the `$LogFileNamePrefix` variable. For example, with `$LogFileNamePrefix = "bootstrap-logs"`:
+---
+
+## Logger
+
+### Initialization
+
+```powershell
+. "$PSScriptRoot\logger.ps1"
+Initialize-Logging -Prefix "my-script" -RetentionDays 7 -LogLevel "INFO" -ScriptPath $PSScriptRoot -ScriptStartTime $ScriptStartTime
 ```
-C:\
-└── Scripts\
-    ├── bootstrap.ps1
-    └── logs\
-        └── bootstrap-logs-YYYYMMDD-T-HHMMSS.log
-        └── bootstrap-logs-YYYYMMDD-T-HHMMSS.log
-        └── bootstrap-logs-YYYYMMDD-T-HHMMSS.log
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `Prefix` | Yes | Log file name prefix — e.g. `"my-script"` produces `my-script-20260329-T-083045.log` |
+| `RetentionDays` | Yes | Number of days before old log files are deleted |
+| `LogLevel` | Yes | Minimum level to write — entries below this are suppressed from both console and file |
+| `ScriptPath` | No | Path logged at startup for diagnostics (pass `$PSScriptRoot`) |
+| `ScriptStartTime` | No | Start time logged at startup (pass `$ScriptStartTime`) |
+
+On initialization, the logger automatically writes:
+- Script start time
+- Hostname and executing user
+- PowerShell version
+- Script path
+
+### Writing Logs
+
+```powershell
+Write-Log "Connecting to database." -Level "INFO"
+Write-Log "Query returned $($results.Count) rows." -Level "DEBUG"
+Write-Log "Config file not found, using defaults." -Level "WARN"
+Write-Log "Failed to connect: $_" -Level "ERROR"
 ```
-### Log Rotation
-Log files older than `$LogFileRetentionDays` (default 7) are automatically deleted at the end of each run. Only files matching the $LogFileNamePrefix pattern are removed to avoid interfering with unrelated logs.
 
 ### Log Levels
-Supported levels and their usage:
-| Level  | Description                       |
-|--------|-----------------------------------|
-| DEBUG  | Detailed debug infromation        |
-| INFO   | General informtion   `default `   |
-| NOTICE | Important but non-critical events |
-| WARN   | Warning condidtions               |
-| ERROR  | Errors and exceptions             |
-| FATAL  | Critical failure causing exit     |
 
-All log entries are:
-- Printed to the console (filtered by `$ConsoleLogLevel`) and color-coded
-- Appended to the active log file with timestap
-The console output respects the `$ConsoleLogLevel` variable. For example, setting `$ConsoleLogLevel = "WARN"` will show only warnings, errors, and fatal messages in the console, but all logs are still written to the file.
+Levels are ordered — setting `LogLevel "WARN"` suppresses `DEBUG`, `INFO`, and `NOTICE` from both console output and the log file.
 
-## Error Handling
-Wrap your main logic in a try block. Use `throw` to signal errors, which the script logs and exits cleanly:
+| Level | Console Color | Use For |
+|-------|--------------|---------|
+| `DEBUG` | Dark Gray | Verbose diagnostics |
+| `INFO` | White | General progress |
+| `NOTICE` | Cyan | Notable milestones |
+| `WARN` | Yellow | Non-fatal issues |
+| `ERROR` | Dark Red | Recoverable errors |
+| `FATAL` | Red | Unrecoverable failures |
+
+### Log Output
+
+```
+[2026-03-29 08:30:45] [INFO] Script Start: 03/29/2026 08:30:45
+[2026-03-29 08:30:45] [DEBUG] Running on: WORKSTATION01 as: jdoe
+[2026-03-29 08:30:45] [DEBUG] PowerShell version: 5.1.19041.5247
+[2026-03-29 08:30:45] [DEBUG] Script path: C:\Scripts\my-script
+[2026-03-29 08:30:46] [INFO] Connecting to database.
+[2026-03-29 08:30:46] [WARN] Config file not found, using defaults.
+[2026-03-29 08:30:47] [INFO] Script finished. Duration: 2.13 seconds.
+```
+
+Log files are written to `.\logs\` relative to the script location and are automatically cleaned up based on `RetentionDays`.
+
+---
+
+## Exit Codes
+
+`$ExitCode` is initialized to `0` and passed to `exit` at the end of `finally`, so Task Scheduler and other callers always receive an explicit code.
+
+Set it in your `catch` block or anywhere in the `try` block where a failure condition is detected:
+
 ```powershell
-try {
-    Remove-ADGroupMember -Identity $group -Users $user -ErrorAction Stop
-}
 catch {
-    throw "Failed to remove $user with error: $_"
+    Write-Log "Error: $_" -Level "FATAL"
+    $ExitCode = 1
 }
 ```
 
-## Scheduled Task Considerations
-This script is designed to work well with Scheduled Tasks:
-- Uses `$PSScriptRoot` for relative paths
-- Sets the current directory to script root for consistent file operations
-- Provides console and file logging for runtime visibility and post-run analysis
+Use distinct non-zero values if you need to differentiate failure types in the calling system.
 
-## Extending the Script
-- Add your main automation logic in the Main Script Logic section.
-- Add reusable functions in the Custom Functions section.
-- Add or remove modules in the Import-Modules function as needed.
+---
 
-## License
-This project is released into the public domain under the Unlicense.
+## Structure
+
+```
+PowerShellScriptBootStrap/
+├── logger.ps1       # Logging module
+├── template.ps1     # Script template
+└── logs/            # Created automatically at runtime (gitignored)
+```
